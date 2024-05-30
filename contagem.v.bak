@@ -1,0 +1,419 @@
+/*
+Autor: Malki-çedheq Benjamim
+Disciplina: Eletrônica Digital 1A
+Descrição: Modulo para geração de pixel para interface VGA
+Referência: 
+	https://web.mit.edu/6.361/www/labkit/vga.shtml
+	http://tinyvga.com/vga-timing/640x480@60Hz
+
+Detalhamento:
+
+	O módulo `pixel_generator` é uma parte crucial da interface VGA, responsável por gerar os sinais de cor que serão enviados para o monitor ou tela. Ele cria diferentes padrões de cores e imagens na tela, baseados em contadores de varredura vertical e horizontal, bem como nas chaves de entrada `key`.
+	
+	1. **Entradas:**
+		- `clock`: O sinal de clock do sistema.
+		- `dat_act_h`: Sinal de ativação de pixels horizontal (vem do módulo de sincronização horizontal).
+		- `dat_act_v`: Sinal de ativação de pixels vertical (vem do módulo de sincronização vertical).
+		- `hcount`: Contador de varredura horizontal (número da coluna atual).
+		- `vcount`: Contador de varredura vertical (número da linha atual).
+		- `key`: Chaves de entrada que definem o padrão de cores a ser exibido.
+		
+	2. **Saídas:**
+		- `vga_r`, `vga_g`, `vga_b`: Sinais de cores vermelha, verde e azul, respectivamente, que serão enviados para o monitor.
+		
+	3. **Variáveis e Sinais Internos:**
+		- `disp_RGB`: Sinal interno para armazenar os valores das cores a serem enviados para o monitor.
+		- `data`: Registrador para armazenar os dados das cores a serem exibidas.
+		- `h_dat` e `v_dat`: Registradores para controlar as cores das barras horizontais e verticais.
+		- `dat_cruz` e `dat_char`: Registradores para controlar cores específicas em posições específicas da tela.
+		- `vga_clk`: Sinal de clock interno para sincronização.
+		
+	4. **Constantes de Cores:**
+		- Definem as constantes para as diferentes cores, como preto, vermelho, verde, etc.
+		
+	5. **Lógica de Geração de Clock Interno:**
+		- Gera um sinal de clock interno `vga_clk` com uma frequência de 25 MHz para sincronização.
+		
+	6. **Lógica de Saída VGA:**
+		- Os sinais `dat_act_h` e `dat_act_v` são usados para ativar os pixels apenas quando a varredura horizontal e vertical estiver ocorrendo.
+		- O sinal `disp_RGB` é preenchido com os valores de cor apropriados com base nos padrões e posições.
+		- Os sinais de cores `vga_r`, `vga_g` e `vga_b` são definidos de acordo com os valores presentes em `disp_RGB`.
+		
+	7. **Lógica de Geração de Cores:**
+		- Diferentes lógicas são implementadas para gerar cores em diferentes partes da tela com base nos contadores de varredura horizontal e vertical.
+		- Padrões de cores incluem barras de cores horizontais e verticais, um tabuleiro colorido e cruzes.
+
+O módulo `pixel_generator` é fundamental para criar as imagens e cores na tela VGA, e suas saídas são as cores que serão exibidas no monitor. A combinação dessas saídas cria diferentes padrões visuais e imagens na tela.
+*/
+module pixel_generator1(
+   clock,   
+	dat_act_h,
+	dat_act_v,
+	hcount,
+   vcount,
+	//key,
+	decimo,
+	uni_segundo,
+	dec_segundo,
+	minuto,
+   vga_r, vga_g, vga_b   
+);
+	input clock;     	//50MHz clock de entrada do sistema
+	input dat_act_h;		//flag auxiliar para ativação de pixels (horizontal)
+	input dat_act_v;		//flag auxiliar para ativação de pixels (vertical)
+	input [9:0] hcount;	//valor do contador de varredura horizontal
+	input [9:0] vcount;	//valor do contador de varredura vertical
+	//input  [2:1] key;  	//conexão com chaves/botes da placa
+	input decimo;
+	input uni_segundo;
+	input dec_segundo;
+	input minuto;
+	output vga_r, vga_g, vga_b;    //Saída de dados VGA
+
+	wire [2:0] disp_RGB; //net para condução dos dados VGA a saída RGB
+
+	reg [2:0] data;      //registrador para dados VGA
+	reg [2:0] h_dat;     //registrador para posição horizontal
+	reg [2:0] v_dat;     //registrador para posição vertical
+	reg [2:0] dat_draw;  //registrador para ...
+
+	wire  dat_act;			//condução para ativação dos pixels
+	reg   vga_clk; 	   //clock do VGA
+
+	// CONSTANTES: Cores
+	localparam BLACK 	= 3'h0; 	// Preto
+	localparam RED   	= 3'h1; 	// Vermelho
+	localparam GREEN 	= 3'h2; 	// Verde
+	localparam YELLOW	= 3'h3; 	// Amarelo
+	localparam BLUE	= 3'h4; 	// Azul
+	localparam MAGENTA= 3'h5;  // Magenta
+	localparam CYAN  	= 3'h6;  // Ciano
+	localparam WHITE 	= 3'h7; 	// Branco
+	
+	// CONSTANTES: Central da tela
+	localparam CENTER_X = 455;
+	localparam CENTER_Y = 283;
+	
+	
+	// CONSTANTES: Dimensão de caracteres
+	localparam CHAR_WIDTH = 2;
+	localparam CHAR_HEIGHT = 3;
+
+   //******************Geração de clock interno***********************
+	always @(posedge clock)
+	begin
+		vga_clk = ~vga_clk;
+	end
+	//--------------------------------------------
+
+	//************************VGA saídas*******************************
+	// atribuição dos sinais às respectivas saídas
+	assign dat_act = dat_act_h && dat_act_v;
+	assign disp_RGB = (dat_act) ?  data : 3'h00;     
+	assign vga_r = disp_RGB[0];
+	assign vga_g = disp_RGB[1];
+	assign vga_b = disp_RGB[2];
+	//--------------------------------------------
+	
+	//************************VGA EXIBIÇÃO*******************************
+
+
+		
+	//Lógica para gerar a saída dat_draw
+	always @(posedge vga_clk)
+	begin
+		 data <= dat_draw;
+		 localparam TOP_X = 230;
+		 localparam ESQ_Y = 41;
+		 
+	    draw_bg(BLACK);
+		 
+		 draw_sqr(TOP_X, ESQ_Y, 1, WHITE);
+		 
+		 case(decimo)
+			0: draw_0(230,185,1,WHITE);
+			1: draw_1(230,185,1,WHITE);
+			2: draw_2(230,185,1,WHITE);
+			3: draw_3(230,185,1,WHITE);
+			4: draw_4(230,185,1,WHITE);
+			5: draw_5(230,185,1,WHITE);
+			6: draw_6(230,185,1,WHITE);
+			7: draw_7(230,185,1,WHITE);
+			8: draw_8(230,185,1,WHITE);
+			9: draw_9(230,185,1,WHITE);
+		endcase
+		draw_2pontos(190,185,1,WHITE);
+		case(centesimo)
+			0: draw_0(230,185,1,WHITE);
+			1: draw_1(230,185,1,WHITE);
+			2: draw_2(230,185,1,WHITE);
+			3: draw_3(230,185,1,WHITE);
+			4: draw_4(230,185,1,WHITE);
+			5: draw_5(230,185,1,WHITE);
+			6: draw_6(230,185,1,WHITE);
+			7: draw_7(230,185,1,WHITE);
+			8: draw_8(230,185,1,WHITE);
+			9: draw_9(230,185,1,WHITE);
+		endcase
+				
+		
+	end
+	
+	//TASK: Lógica para desenhar background
+	task draw_bg(input [3:1] COLOR);
+    begin
+        if (vcount >= 0 && vcount < 480 && hcount >= 0 && hcount < 640) 
+				dat_draw <= COLOR;  
+    end
+	endtask
+	
+	//TASK: Lógica para desenhar o quadrado
+	task draw_sqr (input [10:1] POSX, POSY, WIDTH, input [3:1] COLOR);
+    begin
+		if (vcount >= POSY && vcount < POSY+WIDTH*CHAR_HEIGHT && hcount >= POSX && hcount < POSX+WIDTH*CHAR_WIDTH) 
+				dat_draw <= COLOR;            
+    end
+	endtask
+	
+	//TASK: Lógica para desenhar a letra A
+	
+	//TASK: Lógica para desenhar o numero 1
+	
+	task draw_1(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<3; i=i+1) begin
+			draw_sqr(POSX+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+4, POSY+i, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 2
+	
+	task draw_2(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<8; i=i+1) begin
+			draw_sqr(POSX+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<9; i=i+1) begin
+			draw_sqr(POSX+9, POSY+1+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<7; i=i+1) begin
+			draw_sqr(POSX+i, POSY+9, THICK, COLOR);
+		end
+		
+		for(i=0; i<9; i=i+1) begin
+			draw_sqr(POSX, POSY+10+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<7; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 3
+	
+	task draw_3(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+9, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<8; i=i+1) begin
+			draw_sqr(POSX+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<7; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+9, THICK, COLOR);
+		end
+		
+		for(i=0; i<8; i=i+1) begin
+			draw_sqr(POSX+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 4
+	
+	task draw_4(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<13; i=i+1) begin
+			draw_sqr(POSX, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+13, THICK, COLOR);
+		end
+		
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+8, POSY+i, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 5
+	
+	task draw_5(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<8; i=i+1) begin
+			draw_sqr(POSX, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<11; i=i+1) begin
+			draw_sqr(POSX+7, POSY+8+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<5; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+8, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 6
+	
+	task draw_6(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<12; i=i+1) begin
+			draw_sqr(POSX+8, POSY+7+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<7; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+7, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 7
+	
+	task draw_7(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+9, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<8; i=i+1) begin
+			draw_sqr(POSX+i, POSY, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 8
+	
+	task draw_8(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+8, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+9, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógia para desenhar o número 9
+	
+	task draw_9(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<12; i=i+1) begin
+			draw_sqr(POSX, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+8, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+12, THICK, COLOR);
+		end
+		
+		for(i=0; i<7; i=i+1) begin
+			draw_sqr(POSX+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar o número 0
+	
+	task draw_0(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<19; i=i+1) begin
+			draw_sqr(POSX+8, POSY+i, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+9, THICK, COLOR);
+		end
+		
+		for(i=0; i<6; i=i+1) begin
+			draw_sqr(POSX+1+i, POSY+19, THICK, COLOR);
+		end
+	 end
+	endtask
+	
+	//TASK: Lógica para desenhar dois pontos
+	
+	task draw_2Pontos(input [10:1] POSX, POSY, THICK, input [3:1] COLOR);
+    begin
+		integer i;
+			draw_sqr(POSX, POSY, THICK, COLOR);
+			draw_sqr(POSX, POSY+10, THICK, COLOR);
+	 end
+	endtask
+endmodule
