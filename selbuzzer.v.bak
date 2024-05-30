@@ -1,0 +1,7 @@
+module selbuzzer (
+	input clk,m1,m2,sel,
+	output buzzer
+);
+	
+	buzzer <= (m1 & ~sel) | (m2 & sel)
+endmodule

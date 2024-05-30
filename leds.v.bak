@@ -1,0 +1,48 @@
+module leds (
+	input play,stop,
+	output reg [4:1] leds
+);
+	reg states;
+	reg s0 = 2'b00;
+	reg s1 = 2'b01;
+	reg s2 = 2'b10;
+	reg led = 4'1111;
+	always @ (states)
+	begin : L1
+		case(states)
+			s0:
+				if(play == 1'b1)
+				begin
+					states <= s1;
+				end
+			s1:
+				if(stop == 1'b1)
+				begin
+					states <= s0;
+				end
+				else if(play == 1'b1)
+				begin
+					states <= s2;
+				end
+			s2:
+				if(stop == 1'b1)
+				begin
+					states <= s0;
+				end
+				else if(play == 1'b1)
+				begin
+					states <= s1;
+				end
+		endcase
+		case(states)
+			s0:
+				led = 4'0111;
+			s1:
+				led = 4'1011;
+			s2:
+				led = 4'1101;
+			defaults: led = 4'1110;
+		endcase
+	end
+	assign leds = led;
+endmodule

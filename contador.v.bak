@@ -1,0 +1,101 @@
+module contador(
+	input clk,play,stop,
+	output decimo,uni_segundo,dec_segundo,minuto
+);
+	reg states;
+	reg s0 = 2'b00;
+	reg s1 = 2'b01;
+	reg s2 = 2'b10;
+	wire div;
+	reg dec,useg,dseg,min;
+	divisor_clock 	div_clk( .Clk_out(div),
+									.Clk_in(clk),
+									.Overflow(25000000)
+						);
+			
+	always @ (states)
+	begin : L1
+		case(states)
+			s0:
+				if(play == 1'b1)
+				begin
+					states <= s1;
+				end
+			s1:
+				if(stop == 1'b1)
+				begin
+					states <= s0;
+				end
+				else if(play == 1'b1)
+				begin
+					states <= s2;
+				end
+			s2:
+				if(stop == 1'b1)
+				begin
+					states <= s0;
+				end
+				else if(play == 1'b1)
+				begin
+					states <= s1;
+				end
+		endcase
+	end
+	
+	always @ (clk)
+	begin : L2
+		case(states)
+			s0:
+			begin
+				dec = 0;
+				useg = 0;
+				dseg = 0;
+				min = 0;
+			end
+			s1:
+			begin
+				if(posedge div)
+				begin
+					if (dec < 9)
+					begin
+						dec = dec+1;
+					end
+					else if (useg < 9)
+					begin
+						dec = 0;
+						useg = useg+1;
+					end
+					else if (dseg < 5)
+					begin
+						dec = 0;
+						useg = 0;
+						dseg = dseg+1;
+					end
+					else if (min < 9)
+					begin
+						dec = 0;
+						useg = 0;
+						dseg = 0;
+						min = min+1;
+					end
+					else
+					begin
+						dec = 0;
+						useg = 0;
+						dseg = 0;
+						min = 0;
+					end
+				end
+			s2:
+			begin
+				dec = 0;
+				useg = 0;
+				dseg = 0;
+				min = 0;
+			end
+		endcase
+	end	
+endmodule			
+			
+			
+			
